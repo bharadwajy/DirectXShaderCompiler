@@ -8951,8 +8951,160 @@ class db_hlsl(object):
         )
         self.attributes = attributes
 
+def generate_tablegen_value_str(obj) :
+    value_str = ""
+    valType = str(type(obj))
+    match valType:
+        case "<class 'str'>" :
+            if ("\n" in obj) :
+                value_str += "[{" + "\"" + obj + "\"" + "}]"
+            else :
+                value_str += "\"" + obj + "\""
+        case "<class 'int'>" :
+            value_str += str(obj)
+        case "<class 'bool'>" :
+            value_str += str(1) if obj else str(0)
+        case "<class 'list'>" :
+            value_str += "["
+            item_str_list = []
+            for i in obj :
+                item_str_list.append(generate_tablegen_value_str(i))
+            items_str = ", ".join(item_str_list)
+            value_str += items_str + "]"
+        # Consider dictionary to be a list of strings.
+        case "<class 'dict'>" :
+            value_str += "["
+            item_str_list = []
+            for k, v in obj.items() :
+                item_str_list.append(generate_tablegen_value_str(v))
+            items_str = ", ".join(item_str_list)
+            value_str += items_str + "]"
+        # Convert tuple to be a concatenated string
+        case "<class 'tuple'>" :
+            strs = [str(i) for i in obj]
+            strsj = "_".join(strs)
+            value_str += "\"" + strsj + "\"" if strsj else "\"\""
+        # Convert NoneType to be a string
+        case "<class 'NoneType'>" :
+            value_str += str(obj) if obj else "\"\""
+        case "<class '__main__.db_dxil_param'>" :
+            value_list = []
+            for key, val in vars(obj).items() :
+                value_list.append(generate_tablegen_value_str(val))
+            value_list_j = ", ".join(value_list)
+            if (value_list_j) :
+                value_str += "db_dxil_param<" + value_list_j + ">"
+            else :
+                value_str += "[]"
+        case _ :
+            raise TypeError("Unsupported type in generate_tablegen_value_str()")
+    return value_str
+
+def generate_tablegen_dxil_inst_records(instList) :
+    prop_string = ""
+    count = 0
+    for inst in instList:
+        #if count > 4 :
+        #    break
+        # If the llvm_op associated with this instruction is CallInst, annotate it with "_DXIL_OP"
+        instName = getattr(inst, "name")
+        # Skip gfenerating the record for QuadReadLaneAt since it is th eonly instruction that has a
+        # dxil_param with max_value. Haven't yet figured out how to deduce the type of such keys that
+        # are declated as None types in teh class inintialization
+        if (instName == "QuadReadLaneAt") :
+            continue
+        if (getattr(inst, "llvm_name") == "CallInst") :
+            instName += "_DXIL_OP"
+        record_string = "def " + instName + " : " + inst.__class__.__name__ + "<"
+        record_string_list = []
+        for key, val in vars(inst).items() :
+            record_string_list.append(generate_tablegen_value_str(val))
+
+        record_string += ", ".join(record_string_list) + ">;" + "\n"
+        prop_string += record_string + "\n"
+        count += 1
+    return prop_string
+
+
+objs_for_class_gen = []
+
+def generate_tablegen_class(obj) :
+    # Generate TableGen abstract class name using the class to which
+    # instance object belongs
+    # if (not hasattr(obj, "name")) :
+    #     raise AssertionError("Expected attribute 'name' not found")
+    # if str(type(getattr(obj, "name"))) !=  "<class 'str'>" :
+    #     raise AssertionError("Expected 'string' type of attribute 'name' not found")
+    # name_param = "name_param"
+    # class_record_string = "class " + obj.__class__.__name__ + "<string " + name_param + "> {\n"
+    class_record_string = "class " + obj.__class__.__name__
+    param_str_list = []
+    init_str_list = []
+
+    # Generate TableGen abstract class fields based on each of the attributes
+    # of obj
+    for key, val in vars(obj).items() :
+        valType = str(type(val))
+        match valType:
+            case "<class 'str'>" :
+                typeName = "string"
+                #initVal = "\"\""
+                #class_record_string += "\t string " + key + " = \"\";\n"
+            case "<class 'int'>" :
+                typeName = "int"
+                #initVal = '0'
+                #class_record_string += "\t int " + key + " = 0;\n"
+            case "<class 'bool'>" :
+                typeName = "bit"
+                #initVal = '0'
+                #class_record_string += "\t bit " + key + " = 0;\n"
+            case "<class 'list'>" :
+                typeName = "list<" + val[0].__class__.__name__ + "> "
+                #initVal = "[]"
+                #class_record_string += "\t list<" + val[0].__class__.__name__ + "> " + key + " = [];\n"
+                objs_for_class_gen.append(val[0])
+            # Consider dictionary to be a list of strings.
+            case "<class 'dict'>" :
+                typeName = "list<string>"
+                #initVal = "[]"
+                #class_record_string += "\t list<string> " + key + " = [];\n"
+            # Convert tuple to be a concatenated string
+            case "<class 'tuple'>" :
+                typeName = "string"
+                #initVal = "\"\""
+                #class_record_string += "\t string " + key + " = \"\";\n"
+            # Convert NoneType to be a string
+            case "<class 'NoneType'>" :
+                typeName = "string"
+                #initVal = "\"\""
+                #class_record_string += "\t string " + key + " = \"\";\n"
+            case _ :
+                raise TypeError("Unsupported type in generate_tablegen_class()")
+        initVal = key + "_p"
+        param_str_list.append("  " + typeName + " " + initVal)
+        init_str_list.append("    " + typeName + " " + key + " = " + initVal)
+    param_str = ",\n".join(param_str_list)
+    init_str = ";\n".join(init_str_list)
+    return class_record_string + "<" + param_str + "> {\n" + init_str + ";\n}\n\n"
+
+def generate_tablegen_dxil_inst_class(db) :
+    # Use the first instruction object in the instr list to generate the TableGen
+    # class for the instruction based on the Python class. The assumption is that
+    # this instance is sufficiently initailized for determining the types of various
+    # attributes
+    objs_for_class_gen.append(db.instr[0])
+    ret_string = ""
+    while objs_for_class_gen:
+        obj = objs_for_class_gen[0]
+        cur_class = generate_tablegen_class(obj)
+        ret_string = cur_class + ret_string
+        objs_for_class_gen.remove(obj)
+    return ret_string
 
 if __name__ == "__main__":
     db = db_dxil()
-    print(db)
-    db.print_stats()
+    # print(db)
+    print(generate_tablegen_dxil_inst_class(db))
+    inst_records = generate_tablegen_dxil_inst_records(db.instr)
+    print(inst_records)
+    #db.print_stats()
