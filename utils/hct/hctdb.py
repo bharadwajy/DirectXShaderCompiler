@@ -4,6 +4,8 @@
 # DXIL information.                                                           #
 ###############################################################################
 import os
+import argparse
+import sys
 
 all_stages = (
     "vertex",
@@ -9000,7 +9002,7 @@ def generate_tablegen_value_str(obj) :
             raise TypeError("Unsupported type in generate_tablegen_value_str()")
     return value_str
 
-def generate_tablegen_dxil_inst_records(instList) :
+def generate_tablegen_dxil_inst_records(instList, inst_filter) :
     prop_string = ""
     count = 0
     for inst in instList:
@@ -9015,6 +9017,10 @@ def generate_tablegen_dxil_inst_records(instList) :
             continue
         if (getattr(inst, "llvm_name") == "CallInst") :
             instName += "_DXIL_OP"
+        else :
+            # Skip if this is not an LLVM instruction and a "llvm" filter is specified
+            if (inst_filter == "llvm") :
+                continue
         record_string = "def " + instName + " : " + inst.__class__.__name__ + "<"
         record_string_list = []
         for key, val in vars(inst).items() :
@@ -9102,9 +9108,23 @@ def generate_tablegen_dxil_inst_class(db) :
     return ret_string
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="hctdb.py")
+    parser.add_argument('-t', '--tblgen', type=str, choices={"all", "llvm"}, default=all,
+                        help='Generate td file with specified name')
+    parser.add_argument('-o', '--outfile', type=str,
+                        help='Generate td file with specified name')
+
+    args = parser.parse_args()
     db = db_dxil()
-    # print(db)
-    print(generate_tablegen_dxil_inst_class(db))
-    inst_records = generate_tablegen_dxil_inst_records(db.instr)
-    print(inst_records)
-    #db.print_stats()
+
+    if (args.tblgen) :
+      # Default output file DXIL_hctdb.td
+      out_file = args.outfile if (args.outfile) else "DXIL_hctdb.td"
+      with open(out_file, "w") as f :
+        print(generate_tablegen_dxil_inst_class(db), file=f)
+        inst_records = generate_tablegen_dxil_inst_records(db.instr, args.tblgen)
+        print(inst_records, file=f)
+      print("Generated output in " + args.tblgen)
+    else :
+      print(db)
+      db.print_stats()
