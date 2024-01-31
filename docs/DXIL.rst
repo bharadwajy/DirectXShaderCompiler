@@ -411,8 +411,6 @@ HLSL precise type qualifier requires that all operations contributing to the val
 
 Precise behavior is represented in LLVM instructions: fadd, fsub, fmul, fdiv, frem, fcmp by not having 'fast' math flags set. Each relevant call instruction that contributes to computation of a precise value is annotated with dx.precise metadata that indicates that it is illegal for the driver compiler to perform IEEE-unsafe optimizations.
 
-.. _type-annotations:
-
 Type annotations
 ----------------
 
@@ -2677,7 +2675,7 @@ width : The LSB 5 bits of src0 (0-31).
 
 offset: The LSB 5 bits of src1 (0-31)
 
-.. code:: c
+.. code:: text
 
     if( width == 0 )
     {
@@ -2754,7 +2752,7 @@ accum: a 32-bit unsigned integer, providing an existing accumulation.
 
 dest receives the result of the masked SAD operation added to the accumulation value.
 
-.. code:: c
+.. code:: text
 
     UINT msad( UINT ref, UINT src, UINT accum )
     {
@@ -2989,7 +2987,7 @@ offset: The LSB 5 bits of src1 (0-31).
 
 Given width, offset:
 
-.. code:: c
+.. code:: text
 
     if( width == 0 )
     {
@@ -3319,8 +3317,6 @@ In addition to shader model, DXIL and bitcode representation versions, two other
 Support is provided in the Microsoft Windows family of operating systems, when running on the D3D12 runtime.
 
 The HLSL language is versioned independently of DXIL, and currently follows an 'HLSL <year>' naming scheme. HLSL 2015 is the dialect supported by the d3dcompiler_47 library; a limited form of support is provided in the open source HLSL on LLVM project. HLSL 2016 is the version supported by the current HLSL on LLVM project, which removes some features (primarily effect framework syntax, backquote operator) and adds new ones (wave intrinsics and basic i64 support).
-
-.. _dxil_container_format:
 
 DXIL Container Format
 ---------------------
