@@ -6,6 +6,7 @@
 import os
 import argparse
 import sys
+from pprint import pprint
 
 all_stages = (
     "vertex",
@@ -9002,6 +9003,8 @@ def generate_tablegen_value_str(obj) :
             raise TypeError("Unsupported type in generate_tablegen_value_str()")
     return value_str
 
+attr_set = set()
+
 def generate_tablegen_dxil_inst_records(instList, inst_filter) :
     prop_string = ""
     count = 0
@@ -9015,12 +9018,14 @@ def generate_tablegen_dxil_inst_records(instList, inst_filter) :
         # are declated as None types in teh class inintialization
         if (instName == "QuadReadLaneAt") :
             continue
-        if (getattr(inst, "llvm_name") == "CallInst") :
-            instName += "_DXIL_OP"
+
+        if (inst.is_dxil_op) :
+          instName += "_DXIL_OP"
+          attr_set.add(inst.category)
         else :
-            # Skip if this is not an LLVM instruction and a "llvm" filter is specified
-            if (inst_filter == "llvm") :
-                continue
+          if (inst_filter == "dxil") :
+            continue
+
         record_string = "def " + instName + " : " + inst.__class__.__name__ + "<"
         record_string_list = []
         for key, val in vars(inst).items() :
@@ -9029,6 +9034,7 @@ def generate_tablegen_dxil_inst_records(instList, inst_filter) :
         record_string += ", ".join(record_string_list) + ">;" + "\n"
         prop_string += record_string + "\n"
         count += 1
+    pprint(attr_set)
     return prop_string
 
 
@@ -9109,7 +9115,7 @@ def generate_tablegen_dxil_inst_class(db) :
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="hctdb.py")
-    parser.add_argument('-t', '--tblgen', type=str, choices={"all", "llvm"}, default=all,
+    parser.add_argument('-t', '--tblgen', type=str, choices={"all", "dxil"}, default=all,
                         help='Generate td file with specified name')
     parser.add_argument('-o', '--outfile', type=str,
                         help='Generate td file with specified name')
@@ -9124,7 +9130,7 @@ if __name__ == "__main__":
         print(generate_tablegen_dxil_inst_class(db), file=f)
         inst_records = generate_tablegen_dxil_inst_records(db.instr, args.tblgen)
         print(inst_records, file=f)
-      print("Generated output in " + args.tblgen)
+      print("Generated output in " + args.outfile)
     else :
       print(db)
       db.print_stats()
