@@ -9013,20 +9013,23 @@ def generate_tablegen_dxil_inst_records(instList, inst_filter) :
         #    break
         # If the llvm_op associated with this instruction is CallInst, annotate it with "_DXIL_OP"
         instName = getattr(inst, "name")
-        # Skip gfenerating the record for QuadReadLaneAt since it is th eonly instruction that has a
-        # dxil_param with max_value. Haven't yet figured out how to deduce the type of such keys that
-        # are declated as None types in teh class inintialization
-        if (instName == "QuadReadLaneAt") :
-            continue
 
         if (inst.is_dxil_op) :
           instName += "_DXIL_OP"
-          attr_set.add(inst.category)
+          # Uncomment to collect values of an attribute "some_attribute"
+          # attr_set.add(inst.some_attribute)
         else :
           if (inst_filter == "dxil") :
             continue
 
-        record_string = "def " + instName + " : " + inst.__class__.__name__ + "<"
+        # Comment out the record for QuadReadLaneAt since it is the only instruction that has a
+        # dxil_param with max_value. Haven't yet figured out how to deduce the type of such keys that
+        # are declated as None types in teh class inintialization
+        if (instName == "QuadReadLaneAt") :
+            record_string = "// def "
+        else:
+            record_string = "def "
+        record_string += instName + " : " + inst.__class__.__name__ + "<"
         record_string_list = []
         for key, val in vars(inst).items() :
             record_string_list.append(generate_tablegen_value_str(val))
@@ -9034,7 +9037,7 @@ def generate_tablegen_dxil_inst_records(instList, inst_filter) :
         record_string += ", ".join(record_string_list) + ">;" + "\n"
         prop_string += record_string + "\n"
         count += 1
-    pprint(attr_set)
+    # pprint(attr_set)
     return prop_string
 
 
@@ -9060,36 +9063,22 @@ def generate_tablegen_class(obj) :
         match valType:
             case "<class 'str'>" :
                 typeName = "string"
-                #initVal = "\"\""
-                #class_record_string += "\t string " + key + " = \"\";\n"
             case "<class 'int'>" :
                 typeName = "int"
-                #initVal = '0'
-                #class_record_string += "\t int " + key + " = 0;\n"
             case "<class 'bool'>" :
                 typeName = "bit"
-                #initVal = '0'
-                #class_record_string += "\t bit " + key + " = 0;\n"
             case "<class 'list'>" :
                 typeName = "list<" + val[0].__class__.__name__ + "> "
-                #initVal = "[]"
-                #class_record_string += "\t list<" + val[0].__class__.__name__ + "> " + key + " = [];\n"
                 objs_for_class_gen.append(val[0])
             # Consider dictionary to be a list of strings.
             case "<class 'dict'>" :
                 typeName = "list<string>"
-                #initVal = "[]"
-                #class_record_string += "\t list<string> " + key + " = [];\n"
             # Convert tuple to be a concatenated string
             case "<class 'tuple'>" :
                 typeName = "string"
-                #initVal = "\"\""
-                #class_record_string += "\t string " + key + " = \"\";\n"
             # Convert NoneType to be a string
             case "<class 'NoneType'>" :
                 typeName = "string"
-                #initVal = "\"\""
-                #class_record_string += "\t string " + key + " = \"\";\n"
             case _ :
                 raise TypeError("Unsupported type in generate_tablegen_class()")
         initVal = key + "_p"
