@@ -8954,6 +8954,8 @@ class db_hlsl(object):
         )
         self.attributes = attributes
 
+param_val_set = set()
+
 def generate_tablegen_value_str(obj) :
     value_str = ""
     valType = str(type(obj))
@@ -8971,6 +8973,7 @@ def generate_tablegen_value_str(obj) :
             value_str += "["
             item_str_list = []
             for i in obj :
+                param_val_set.add(i.llvm_type)
                 item_str_list.append(generate_tablegen_value_str(i))
             items_str = ", ".join(item_str_list)
             value_str += items_str + "]"
@@ -9017,7 +9020,9 @@ def generate_tablegen_dxil_inst_records(instList, inst_filter) :
         if (inst.is_dxil_op) :
           instName += "_DXIL_OP"
           # Uncomment to collect values of an attribute "some_attribute"
-          # attr_set.add(inst.some_attribute)
+          attr_set.add(inst.oload_types)
+          if (inst.oload_types == "o") :
+              print(inst.name)
         else :
           if (inst_filter == "dxil") :
             continue
@@ -9037,7 +9042,8 @@ def generate_tablegen_dxil_inst_records(instList, inst_filter) :
         record_string += ", ".join(record_string_list) + ">;" + "\n"
         prop_string += record_string + "\n"
         count += 1
-    # pprint(attr_set)
+    pprint(attr_set)
+    # pprint(param_val_set)
     return prop_string
 
 
@@ -9119,7 +9125,7 @@ if __name__ == "__main__":
         print(generate_tablegen_dxil_inst_class(db), file=f)
         inst_records = generate_tablegen_dxil_inst_records(db.instr, args.tblgen)
         print(inst_records, file=f)
-      print("Generated output in " + args.outfile)
+      print("Generated output in " + out_file)
     else :
       print(db)
       db.print_stats()
