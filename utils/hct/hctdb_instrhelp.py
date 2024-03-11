@@ -4,7 +4,7 @@ import argparse
 import functools
 import collections
 from hctdb import *
-
+from pprint import pprint
 # get db singletons
 g_db_dxil = None
 
@@ -515,6 +515,7 @@ class db_oload_gen:
             "wv": "None",
         }
         attr_fn = lambda i: "Attribute::" + attr_dict[i.fn_attr] + ","
+        my_set = set()
         for i in self.instrs:
             if last_category != i.category:
                 if last_category != None:
@@ -547,7 +548,11 @@ class db_oload_gen:
                     OCC=self.OCC,
                 )
             )
+            my_set.add((i.name, lower_fn(i.dxil_class)))
         print("};")
+        print("##############\n")
+        pprint(my_set)
+        print("##############\n")
 
     def print_opfunc_table(self):
         # Print the table for OP::GetOpFunc
